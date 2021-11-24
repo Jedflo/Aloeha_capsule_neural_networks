@@ -250,9 +250,9 @@ def PrimaryCap(inputs, dim_capsule, n_channels, kernel_size, strides, padding):
     """
     output = layers.Conv2D(filters=dim_capsule*n_channels, kernel_size=kernel_size, strides=strides, padding=padding,
                            name='primarycap_conv2d')(inputs)
-    print("covn2 output")
-    print(output.shape)
-    print([-1, dim_capsule])
+    # print("covn2 output")
+    # print(output.shape)
+    # print([-1, dim_capsule])
     # output=tf.reshape(output, [-1, dim_capsule])
     # print(output.shape)
     # output= tf.keras.layers.Flatten()(output)

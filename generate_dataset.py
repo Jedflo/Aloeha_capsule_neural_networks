@@ -7,6 +7,7 @@ from keras.layers import Conv2D, MaxPooling2D
 from keras.utils import np_utils
 from tensorflow import keras
 import matplotlib.pyplot as plt
+import preprocessor
 import random
 import os
 import numpy as np
@@ -20,7 +21,7 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 DATADIR = "aloeha_dataset/"
 CATEGORIES = ["healthy", "rot", "rust"]
 ML_PHASE = ["Training", "Testing", "Validation"]
-IMG_SIZE = 64
+IMG_SIZE = 32
 COLOR_MODE = 3
 
 ################################################ Getting training data ##########################################
@@ -52,9 +53,9 @@ def load_training_data():
         try:
           #img_array = cv2.imread(os.path.join(category_path,img),cv2.IMREAD_GRAYSCALE)          
           img_array = cv2.imread(os.path.join(category_path,img))
-          #img_array = cv2.imread(os.path.join(category_path,img),cv2.COLOR_RGB2HSV)
-          img_array = cv2.cvtColor(img_array, cv2.COLOR_BGR2HSV)
-          new_array = cv2.resize(img_array, (IMG_SIZE, IMG_SIZE))
+          new_array = preprocessor.autocrop(img_array,(IMG_SIZE, IMG_SIZE))
+          # new_array = cv2.cvtColor(new_array, cv2.COLOR_BGR2HSV)
+          # new_array = cv2.resize(img_array, (IMG_SIZE, IMG_SIZE))
           
           training_data.append([new_array, class_num])
         except Exception as e:
@@ -90,7 +91,7 @@ def load_training_data():
   # print(len(y_train))
 
   # i = 0;
-  # for img in x_train[:5]:
+  # for img in x_train[:10]:
   #   print(y_train[i], end = '\r')
   #   cv2.imshow('test',img)
   #   cv2.waitKey(1000)
@@ -130,8 +131,9 @@ def load_test_data():
         try:
           #img_array = cv2.imread(os.path.join(category_path,img),cv2.IMREAD_GRAYSCALE)
           img_array = cv2.imread(os.path.join(category_path,img))
-          img_array = cv2.cvtColor(img_array, cv2.COLOR_BGR2HSV)
-          new_array = cv2.resize(img_array, (IMG_SIZE, IMG_SIZE))     
+          new_array = preprocessor.autocrop(img_array,(IMG_SIZE, IMG_SIZE))
+          # new_array = cv2.cvtColor(new_array, cv2.COLOR_BGR2HSV)
+          # new_array = cv2.resize(img_array, (IMG_SIZE, IMG_SIZE))     
           testing_data.append([new_array, class_num])
         except Exception as e:
           pass
@@ -141,7 +143,7 @@ def load_test_data():
 
   create_testing_data()
 
-  random.shuffle(testing_data)
+  #random.shuffle(testing_data)
 
   # for sample in testing_data[:10]:
   #   print(sample[1])
@@ -166,11 +168,15 @@ def load_test_data():
   
 
   # i = 0;
-  # for img in x_train[:5]:
-  #   print(y_train[i], end = '\r')
+  # for img in x_test[:10]:
+  #   print(y_test[i], end = '\r')
   #   cv2.imshow('test',img)
   #   cv2.waitKey(1000)
   #   i = i + 1
+  # cv2.destroyAllWindows()
+
+  # cv2.imshow('test',x_test[30])
+  # cv2.waitKey(5000)
   # cv2.destroyAllWindows()
 
   return (x_test, y_test)
@@ -237,12 +243,12 @@ def load_test_data():
 
 # (x_train, y_train)=load_training_data()
 # (x_test, y_test)=load_test_data()
-# # (x_valid, y_valid)=load_validation_data()
+# (x_valid, y_valid)=load_validation_data()
 
 # print("x_train")
 # print("shape:", x_train.shape)
 # print("type:", type(x_train))
-# # print(x_train[0])
+# print(x_train[0])
 
 
 # print("y_train")
@@ -250,24 +256,24 @@ def load_test_data():
 # print("type:", type(y_train))
 # print(y_train[0])
 # i=0
-# # for img in x_train[:5]:
-# #   print(y_train[i])
-# #   # cv2.imshow('test',img)
-# #   # cv2.waitKey(0)
-# #   i = i + 1
+# for img in x_train[:5]:
+#   print(y_train[i])
+#   # cv2.imshow('test',img)
+#   # cv2.waitKey(0)
+#   i = i + 1
 
 # print("x_test")
 # print(x_test.shape)
 # print(type(x_test))
 # print(len(x_test))
-# # #print(x_test[0])
+# #print(x_test[0])
 
 
 # print("y_test")
 # print("shape:", y_test.shape)
 # print("type:", type(y_test))
 # print(len(y_test))
-# #print(y_test[0])
+#print(y_test[0])
 # i=0
 # for img in x_test[:5]:
 #   print(y_test[i])

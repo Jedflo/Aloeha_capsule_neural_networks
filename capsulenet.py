@@ -1,21 +1,6 @@
-"""
-Keras implementation of CapsNet in Hinton's paper Dynamic Routing Between Capsules.
-The current version maybe only works for TensorFlow backend. Actually it will be straightforward to re-write to TF code.
-Adopting to other backends should be easy, but I have not tested this. 
-Usage:
-       python capsulenet.py
-       python capsulenet.py --epochs 50
-       python capsulenet.py --epochs 50 --routings 3
-       ... ...
-       
-Result:
-    Validation accuracy > 99.5% after 20 epochs. Converge to 99.66% after 50 epochs.
-    About 110 seconds per epoch on a single GTX1070 GPU card
-    
-Author: Xifeng Guo, E-mail: `guoxifeng1990@163.com`, Github: `https://github.com/XifengGuo/CapsNet-Keras`
-"""
 
 import numpy as np
+from numpy.lib.function_base import append
 import tensorflow as tf
 from tensorflow.keras import layers, models, optimizers
 from tensorflow.keras import backend as K
@@ -25,36 +10,39 @@ from utils import combine_images
 from PIL import Image
 from capsulelayers import CapsuleLayer, PrimaryCap, Length, Mask
 from LogManager import logFile_update
-from sklearn.metrics import classification_report
+from sklearn.metrics import classification_report, confusion_matrix
 from sklearn.utils import class_weight 
 import generate_dataset as aloe
+import csv
+import cv2 as cv
 
 K.set_image_data_format('channels_last')
 
+IMG_SIZE=32
 
 def CapsNet(input_shape, n_class, routings, batch_size):
     """
-    A Capsule Network on MNIST.
+    Capsule network for Aloe Vera Dataset.
     :param input_shape: data shape, 3d, [width, height, channels]
     :param n_class: number of classes
     :param routings: number of routing iterations
     :param batch_size: size of batch
-    :return: Two Keras Models, the first one used for training, and the second one for evaluation.
-            `eval_model` can also be used for training.
+    :return: Two Keras Models, one for training, one for evaluation.
     """
     x = layers.Input(shape=input_shape, batch_size=batch_size)
 
-    # Layer 1: Just a conventional Conv2D layer
-    conv1 = layers.Conv2D(filters=256, kernel_size=9, strides=1, padding='valid', activation='relu', name='conv1')(x)
+    # Layer 1: Conventional Conv2D layer
+    conv1 = layers.Conv2D(filters=32, kernel_size=9, strides=1, padding='valid', activation=layers.LeakyReLU(alpha=0.3), name='conv1')(x)
+    #filters=256
 
     # Layer 2: Conv2D layer with `squash` activation, then reshape to [None, num_capsule, dim_capsule]
-    primarycaps = PrimaryCap(conv1, dim_capsule=8, n_channels=32, kernel_size=9, strides=2, padding='valid')
+    primarycaps = PrimaryCap(conv1, dim_capsule=4, n_channels=8, kernel_size=9, strides=2, padding='valid')
 
-    # Layer 3: Capsule layer. Routing algorithm works here.
-    digitcaps = CapsuleLayer(num_capsule=n_class, dim_capsule=16, routings=routings, name='digitcaps')(primarycaps)
+    # Layer 3: Capsule layer. Dynamic Routing algorithm works here.
+    digitcaps = CapsuleLayer(num_capsule=n_class, dim_capsule=8, routings=routings, name='aloecaps')(primarycaps)
 
-    # Layer 4: This is an auxiliary layer to replace each capsule with its length. Just to match the true label's shape.
-    # If using tensorflow, this will not be necessary. :)
+
+    # Layer 4: This layer replaces each capsule with its length. Just to match the true label's shape.
     out_caps = Length(name='capsnet')(digitcaps)
 
     # Decoder network.
@@ -62,10 +50,10 @@ def CapsNet(input_shape, n_class, routings, batch_size):
     masked_by_y = Mask()([digitcaps, y])  # The true label is used to mask the output of capsule layer. For training
     masked = Mask()(digitcaps)  # Mask using the capsule with maximal length. For prediction
 
-    # Shared Decoder model in training and prediction
+    #Decoder model in training and prediction
     decoder = models.Sequential(name='decoder')
-    decoder.add(layers.Dense(512, activation='relu', input_dim=16 * n_class))
-    decoder.add(layers.Dense(1024, activation='relu'))
+    decoder.add(layers.Dense(64, activation=layers.LeakyReLU(alpha=0.3), input_dim=8 * n_class))
+    decoder.add(layers.Dense(128, activation=layers.LeakyReLU(alpha=0.3)))
     decoder.add(layers.Dense(np.prod(input_shape), activation='sigmoid'))
     decoder.add(layers.Reshape(target_shape=input_shape, name='out_recon'))
 
@@ -74,7 +62,7 @@ def CapsNet(input_shape, n_class, routings, batch_size):
     eval_model = models.Model(x, [out_caps, decoder(masked)])
 
     # manipulate model
-    noise = layers.Input(shape=(n_class, 16))
+    noise = layers.Input(shape=(n_class, 8)) #16
     noised_digitcaps = layers.Add()([digitcaps, noise])
     masked_noised_y = Mask()([noised_digitcaps, y])
     manipulate_model = models.Model([x, y, noise], decoder(masked_noised_y))
@@ -83,7 +71,7 @@ def CapsNet(input_shape, n_class, routings, batch_size):
 
 def margin_loss(y_true, y_pred):
     """
-    Margin loss for Eq.(4). When y_true[i, :] contains not just one `1`, this loss should work too. Not test it.
+    Margin loss, same equation from Hinton's paper.
     :param y_true: [None, n_classes]
     :param y_pred: [None, num_capsule]
     :return: a scalar loss value.
@@ -98,7 +86,7 @@ def margin_loss(y_true, y_pred):
 def train(model,  # type: models.Model
           data, args):
     """
-    Training a CapsuleNet
+    For Training a CapsuleNet
     :param model: the CapsuleNet model
     :param data: a tuple containing training and testing data, like `((x_train, y_train), (x_test, y_test))`
     :param args: arguments
@@ -111,9 +99,20 @@ def train(model,  # type: models.Model
     log = callbacks.CSVLogger(args.save_dir + '/log.csv', append=True)
     tb = callbacks.TensorBoard(log_dir=args.save_dir + '/tensorboard-logs',
                                batch_size=args.batch_size, histogram_freq=int(args.debug))
-    checkpoint = callbacks.ModelCheckpoint(args.save_dir + '/weights-{epoch:02d}.h5', monitor='capsnet_accuracy',
+    checkpoint = callbacks.ModelCheckpoint(args.save_dir + '/weights-{epoch:02d}.h5', monitor='val_capsnet_accuracy',
                                            save_best_only=True, save_weights_only=True, verbose=1)
-    lr_decay = callbacks.LearningRateScheduler(schedule=lambda epoch: args.lr * (args.lr_decay ** epoch))
+    # lr_decay = callbacks.LearningRateScheduler(schedule=lambda epoch: args.lr * (args.lr_decay ** epoch))
+
+    lr_decay = callbacks.ReduceLROnPlateau(
+    monitor="val_capsnet_accuracy",
+    factor=args.lr_decay,
+    patience=3,
+    verbose=1,
+    mode="max",
+    min_delta=0.0001,
+    cooldown=0,
+    min_lr=0
+)
 
     # compile the model
     model.compile(optimizer=optimizers.Adam(lr=args.lr),
@@ -153,10 +152,27 @@ def train(model,  # type: models.Model
 
     return model
 
+def perf_measure(y_actual, y_hat):
+    TP = 0
+    FP = 0
+    TN = 0
+    FN = 0
 
-def test(model, data, args):
+    for i in range(len(y_hat)): 
+        if y_actual[i]==y_hat[i]==1:
+           TP += 1
+        if y_hat[i]==1 and y_actual[i]!=y_hat[i]:
+           FP += 1
+        if y_actual[i]==y_hat[i]==0:
+           TN += 1
+        if y_hat[i]==0 and y_actual[i]!=y_hat[i]:
+           FN += 1
+
+    return(TP, FP, TN, FN)
+
+def test(model, data, args, full_res_data):
     x_test, y_test = data
-    y_pred, x_recon = model.predict(x_test, batch_size=20)
+    y_pred, x_recon = model.predict(x_test, batch_size=args.batch_size) #100
     print('-' * 30 + 'Begin: test' + '-' * 30)
     print('Test acc:', np.sum(np.argmax(y_pred, 1) == np.argmax(y_test, 1)) / y_test.shape[0])
     img = combine_images(np.concatenate([x_test[:50], x_recon[:50]]))
@@ -166,18 +182,19 @@ def test(model, data, args):
     print('Reconstructed images are saved to %s/real_and_recon.png' % args.save_dir)
     print('-' * 30 + 'End: test' + '-' * 30)
     
-    x_test = np.array(x_test).reshape(-1, 64, 64, 3)
+    #x_test = np.array(x_test).reshape(-1, IMG_SIZE, IMG_SIZE, 1)
     y_test = np.argmax(y_test, axis=1)
     y_classes = [np.argmax(element) for element in y_pred]
     print("Classification Report: \n", classification_report(y_test, y_classes))
-    print(y_classes[:20])
-    print(y_test[:20])
+    conf_matrix = confusion_matrix(y_true = y_test, y_pred = y_classes)
+    print("Confusion Matrix:\n",conf_matrix)
 
+    classification = ["Healthy", "Rot", "Rust"]
 
-    
-    plt.imshow(plt.imread(args.save_dir + "/real_and_recon.png"))
-    plt.show()
-
+    for element in range(len(y_classes)):#len(y_classes)
+        with open('./Experiment Paper/trial5.csv', 'a', newline='') as file:
+            writer = csv.writer(file)
+            writer.writerow([classification[y_classes[element]]])
 
 def manipulate_latent(model, data, args):
     print('-' * 30 + 'Begin: manipulate' + '-' * 30)
@@ -224,10 +241,10 @@ def load_mnist():
 def load_aloe():
     (x_train, y_train) = aloe.load_training_data()
     (x_test, y_test) = aloe.load_test_data()
-    x_train = x_train[:2000]
-    y_train = y_train[:2000]
-    x_test = x_test[:1000]
-    y_test = y_test[:1000]
+    # x_train = x_train[:2000]
+    # y_train = y_train[:2000]
+    # x_test = x_test[:1000]
+    # y_test = y_test[:1000]
     return (x_train, y_train), (x_test, y_test)
 
 
@@ -238,9 +255,9 @@ if __name__ == "__main__":
     from tensorflow.keras import callbacks
 
     # setting the hyper parameters
-    parser = argparse.ArgumentParser(description="Capsule Network on MNIST.")
-    parser.add_argument('--epochs', default=100, type=int) #def 50
-    parser.add_argument('--batch_size', default=20, type=int) #def 100
+    parser = argparse.ArgumentParser(description="Capsule Network on Aloe Vera Dataset.")
+    parser.add_argument('--epochs', default=200, type=int) 
+    parser.add_argument('--batch_size', default=20, type=int)
     parser.add_argument('--lr', default=0.001, type=float,
                         help="Initial learning rate")
     parser.add_argument('--lr_decay', default=0.9, type=float,
@@ -248,7 +265,7 @@ if __name__ == "__main__":
     parser.add_argument('--lam_recon', default=0.392, type=float,
                         help="The coefficient for the loss of decoder")
     parser.add_argument('-r', '--routings', default=3, type=int,
-                        help="Number of iterations used in routing algorithm. should > 0")
+                        help="Number of iterations used in routing algorithm. should > 0") 
     parser.add_argument('--shift_fraction', default=0.1, type=float,
                         help="Fraction of pixels to shift at most in each direction.")
     parser.add_argument('--debug', action='store_true',
@@ -266,10 +283,8 @@ if __name__ == "__main__":
     if not os.path.exists(args.save_dir):
         os.makedirs(args.save_dir)
 
-    # load data
-    #(x_train, y_train), (x_test, y_test) = load_mnist()
     (x_train, y_train), (x_test, y_test) = load_aloe()
-
+    (x_test_full, y_test_train) = aloe.load_test_data_fullsize()
     
     # define model
     model, eval_model, manipulate_model = CapsNet(input_shape=x_train.shape[1:],
@@ -279,7 +294,7 @@ if __name__ == "__main__":
     model.summary()
 
     # train or test
-    if args.weights is not None:  # init the model weights with provided one
+    if args.weights is not None:  # initialize the model weights with provided one
         model.load_weights(args.weights)
     if os.path.exists("./result/trained_model.h5"):
         print("trained model found!")
@@ -288,8 +303,8 @@ if __name__ == "__main__":
         print("weights succesfully loaded!")
     if not args.testing:
         #train(model=model, data=((x_train, y_train), (x_test, y_test)), args=args)
-        test(model=eval_model, data=(x_test, y_test), args=args)
-    else:  # as long as weights are given, will run testing
+        test(model=eval_model, data=(x_test, y_test), args=args, full_res_data=(x_test_full, y_test_train))
+    else:  # as long as weights are given, testing will run
         if args.weights is None:
             print('No weights are provided. Will test using random initialized weights.')
         manipulate_latent(manipulate_model, (x_test, y_test), args)

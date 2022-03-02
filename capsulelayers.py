@@ -1,12 +1,3 @@
-"""
-Some key layers used for constructing a Capsule Network. These layers can used to construct CapsNet on other dataset, 
-not just on MNIST.
-*NOTE*: some functions can be implemented in multiple ways, I keep all of them. You can try them for yourself just by
-uncommenting them and commenting their counterparts.
-
-Author: Xifeng Guo, E-mail: `guoxifeng1990@163.com`, Github: `https://github.com/XifengGuo/CapsNet-Keras`
-"""
-
 import tensorflow.keras.backend as K
 import tensorflow as tf
 from tensorflow.keras import initializers, layers
@@ -29,7 +20,7 @@ class Length(layers.Layer):
         config = super(Length, self).get_config()
         return config
 
-
+#Mask Borrowed from Aurelien Geron
 class Mask(layers.Layer):
     """
     Mask a Tensor with shape=[None, num_capsule, dim_vector] either by the capsule with max length or by an additional 
@@ -74,7 +65,7 @@ class Mask(layers.Layer):
 
 def squash(vectors, axis=-1):
     """
-    The non-linear activation used in Capsule. It drives the length of a large vector to near 1 and small vector to 0
+    The non-linear activation used in Capsules. It "squashes" large vectors to near 1 and small vectors to 0
     :param vectors: some vectors to be squashed, N-dim tensor
     :param axis: the axis to squash
     :return: a Tensor with same shape as input vectors
@@ -87,7 +78,7 @@ def squash(vectors, axis=-1):
 class CapsuleLayer(layers.Layer):
     """
     The capsule layer. It is similar to Dense layer. Dense layer has `in_num` inputs, each is a scalar, the output of the 
-    neuron from the former layer, and it has `out_num` output neurons. CapsuleLayer just expand the output of the neuron
+    neuron from the previuos layer, and it has `out_num` output neurons. CapsuleLayer turns the output of the neuron
     from scalar to vector. So its input shape = [None, input_num_capsule, input_dim_capsule] and output shape = \
     [None, num_capsule, dim_capsule]. For Dense Layer, input_dim_capsule = dim_capsule = 1.
     
@@ -117,50 +108,6 @@ class CapsuleLayer(layers.Layer):
 
         self.built = True
 
-    # def call(self, inputs, training=None):
-    #     # inputs.shape=[None, input_num_capsule, input_dim_capsule]
-    #     # inputs_expand.shape=[None, 1, input_num_capsule, input_dim_capsule]
-    #     inputs_expand = K.expand_dims(inputs, 1)
-
-    #     # Replicate num_capsule dimension to prepare being multiplied by W
-    #     # inputs_tiled.shape=[None, num_capsule, input_num_capsule, input_dim_capsule]
-    #     inputs_tiled = K.tile(inputs_expand, [1, self.num_capsule, 1, 1])
-
-    #     # Compute `inputs * W` by scanning inputs_tiled on dimension 0.
-    #     # x.shape=[num_capsule, input_num_capsule, input_dim_capsule]
-    #     # W.shape=[num_capsule, input_num_capsule, dim_capsule, input_dim_capsule]
-    #     # Regard the first two dimensions as `batch` dimension,
-    #     # then matmul: [input_dim_capsule] x [dim_capsule, input_dim_capsule]^T -> [dim_capsule].
-    #     # inputs_hat.shape = [None, num_capsule, input_num_capsule, dim_capsule]
-    #     inputs_hat = K.map_fn(lambda x: K.batch_dot(x, self.W, [2, 3]), elems=inputs_tiled)
-
-    #     # Begin: Routing algorithm ---------------------------------------------------------------------#
-    #     # The prior for coupling coefficient, initialized as zeros.
-    #     # b.shape = [None, self.num_capsule, self.input_num_capsule].
-    #     b = tf.zeros(shape=[K.shape(inputs_hat)[0], self.num_capsule, self.input_num_capsule])
-
-    #     assert self.routings > 0, 'The routings should be > 0.'
-    #     for i in range(self.routings):
-    #         # c.shape=[batch_size, num_capsule, input_num_capsule]
-    #         c = tf.compat.v1.nn.softmax(b, dim=1)
-
-    #         # c.shape =  [batch_size, num_capsule, input_num_capsule]
-    #         # inputs_hat.shape=[None, num_capsule, input_num_capsule, dim_capsule]
-    #         # The first two dimensions as `batch` dimension,
-    #         # then matmal: [input_num_capsule] x [input_num_capsule, dim_capsule] -> [dim_capsule].
-    #         # outputs.shape=[None, num_capsule, dim_capsule]
-    #         outputs = squash(K.batch_dot(c, inputs_hat, [2, 2]))  # [None, 10, 16]
-
-    #         if i < self.routings - 1:
-    #             # outputs.shape =  [None, num_capsule, dim_capsule]
-    #             # inputs_hat.shape=[None, num_capsule, input_num_capsule, dim_capsule]
-    #             # The first two dimensions as `batch` dimension,
-    #             # then matmal: [dim_capsule] x [input_num_capsule, dim_capsule]^T -> [input_num_capsule].
-    #             # b.shape=[batch_size, num_capsule, input_num_capsule]
-    #             b += K.batch_dot(outputs, inputs_hat, [2, 3])
-    #     # End: Routing algorithm -----------------------------------------------------------------------#
-
-    #     return outputs
 
     def call(self, inputs, training=None):
         # Expand the input in axis=1, tile in that axis to num_capsule, and 
@@ -242,7 +189,7 @@ class CapsuleLayer(layers.Layer):
 
 def PrimaryCap(inputs, dim_capsule, n_channels, kernel_size, strides, padding):
     """
-    Apply Conv2D `n_channels` times and concatenate all capsules
+    Apply Conv2D `n_channels` times and connect all capsules
     :param inputs: 4D tensor, shape=[None, width, height, channels]
     :param dim_capsule: the dim of the output vector of capsule
     :param n_channels: the number of types of capsules
@@ -250,25 +197,8 @@ def PrimaryCap(inputs, dim_capsule, n_channels, kernel_size, strides, padding):
     """
     output = layers.Conv2D(filters=dim_capsule*n_channels, kernel_size=kernel_size, strides=strides, padding=padding,
                            name='primarycap_conv2d')(inputs)
-    # print("covn2 output")
-    # print(output.shape)
-    # print([-1, dim_capsule])
-    # output=tf.reshape(output, [-1, dim_capsule])
-    # print(output.shape)
-    # output= tf.keras.layers.Flatten()(output)
-    # print(output.shape)
+                           
     outputs = layers.Reshape(target_shape=(-1, dim_capsule), name='primarycap_reshape')(output)
     return layers.Lambda(squash, name='primarycap_squash')(outputs)
 
 
-"""
-# The following is another way to implement primary capsule layer. This is much slower.
-# Apply Conv2D `n_channels` times and concatenate all capsules
-def PrimaryCap(inputs, dim_capsule, n_channels, kernel_size, strides, padding):
-    outputs = []
-    for _ in range(n_channels):
-        output = layers.Conv2D(filters=dim_capsule, kernel_size=kernel_size, strides=strides, padding=padding)(inputs)
-        outputs.append(layers.Reshape([output.get_shape().as_list()[1] ** 2, dim_capsule])(output))
-    outputs = layers.Concatenate(axis=1)(outputs)
-    return layers.Lambda(squash)(outputs)
-"""

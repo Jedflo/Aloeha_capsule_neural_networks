@@ -9,10 +9,10 @@ import matplotlib.pyplot as plt
 from utils import combine_images
 from PIL import Image
 from capsulelayers import CapsuleLayer, PrimaryCap, Length, Mask
-from LogManager import logFile_update
+from logManager import logFile_update
 from sklearn.metrics import classification_report, confusion_matrix
 from sklearn.utils import class_weight 
-import generate_dataset as aloe
+import datasetManager as aloe
 import csv
 import cv2 as cv
 
@@ -191,10 +191,11 @@ def test(model, data, args, full_res_data):
 
     classification = ["Healthy", "Rot", "Rust"]
 
-    for element in range(len(y_classes)):#len(y_classes)
-        with open('./Experiment Paper/trial5.csv', 'a', newline='') as file:
-            writer = csv.writer(file)
-            writer.writerow([classification[y_classes[element]]])
+    ### Writes all the classification of each image from the test data in a csv file.###
+    # for element in range(len(y_classes)):#len(y_classes)
+    #     with open('allClassifications.csv', 'a', newline='') as file:
+    #         writer = csv.writer(file)
+    #         writer.writerow([classification[y_classes[element]]])
 
 def manipulate_latent(model, data, args):
     print('-' * 30 + 'Begin: manipulate' + '-' * 30)
@@ -241,10 +242,6 @@ def load_mnist():
 def load_aloe():
     (x_train, y_train) = aloe.load_training_data()
     (x_test, y_test) = aloe.load_test_data()
-    # x_train = x_train[:2000]
-    # y_train = y_train[:2000]
-    # x_test = x_test[:1000]
-    # y_test = y_test[:1000]
     return (x_train, y_train), (x_test, y_test)
 
 

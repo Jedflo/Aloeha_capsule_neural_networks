@@ -6,4 +6,4 @@ notes.txt
 /dataset_arrangement/*
 /Experiment Paper/*
 /misclassified/*
-/sample inputs/*
+generateGraph.py

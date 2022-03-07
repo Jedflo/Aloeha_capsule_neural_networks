@@ -1,2 +1,9 @@
 /__weights/*
 .gitignore
+notes.txt
+/aloeha_dataset/*
+/aloeha_dataset_removed/*
+/dataset_arrangement/*
+/Experiment Paper/*
+/misclassified/*
+/sample inputs/*

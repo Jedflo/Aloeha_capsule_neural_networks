@@ -51,3 +51,6 @@ Training hyper parameters used:
 
 ![capsnet graph](https://user-images.githubusercontent.com/82581503/156989638-ab8b0a25-83cd-494c-a2e0-836b078780b7.png)
 
+![performance metrics](https://user-images.githubusercontent.com/82581503/156989725-55d0803e-5a21-4393-bbee-e4ff4e1ae03e.png)
+
+

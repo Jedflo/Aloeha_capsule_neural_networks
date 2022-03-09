@@ -85,7 +85,7 @@ Aloeha capsnet, unlike MNIST Capsnet, was not able to reconstruct the input imag
 
 ![image](https://user-images.githubusercontent.com/82581503/157383577-9c8d76c9-8336-4229-b9a7-cf8e5adc6b9d.png)
 
-Note that the numbers above represent *number of images*. i.e., 1 image was classified as containing a healthy leaf, but it actually contained leaf rot.  
+Note that the numbers above represent *number of images*. i.e., 1 image was classified as containing a healthy leaf, but the leaf actually had rot.  
 
 
 

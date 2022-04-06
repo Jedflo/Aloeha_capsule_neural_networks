@@ -13,7 +13,7 @@ Aloeha Capsnet is a Tensorflow 2.2 implementation of [Capusle Neural Network by 
 The output of the thesis is an [Android application](https://github.com/Jedflo/Aloeha_UI_Manager) that uses capsule neural networks to identify if an aloe vera leaf is healthy, rotting or rusting. 
 The goal is to measure the performance of capsnet in identifying aloe vera leaf afflications and compare it to the performance of [Aloeha-Alexnet](https://github.com/raze47/AlexNet-Aloeha) and [Aloeha-VGG19](https://github.com/raze47/VGG19-Aloeha)
 
-## Aloeha Capsnet Model and Training
+## Aloeha Capsnet Model Design and Training
 ### The model architecture
 ![image](https://user-images.githubusercontent.com/82581503/156983510-3109d1e1-0ec7-40e0-878f-c4c39ab1bebd.png)
  Layers:
